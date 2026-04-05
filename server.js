@@ -11,7 +11,7 @@ const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || 'worklog-frontend-two.vercel.app',
+  origin: process.env.CLIENT_ORIGIN || 'https://worklog-frontend-two.vercel.app',
   credentials: true,
 }));
 app.use(express.json());
