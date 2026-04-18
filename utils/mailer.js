@@ -88,7 +88,13 @@ If you did not request this, ignore this email — your password will not change
 </html>`,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent to:', toEmail);
+    console.log('✅ Response:', info.response);
+  } catch (err) {
+    console.error('❌ Email FAILED:', err.message);
+    throw err;
+  }
 }
-
 module.exports = { sendPasswordResetEmail };
