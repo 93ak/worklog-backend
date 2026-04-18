@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema(
       enum: ['employee', 'admin'],
       default: 'employee',
     },
+
+    resetToken:       { type: String, default: null },
+    resetTokenExpiry: { type: Date,   default: null },
+    email: { type: String, trim: true, lowercase: true },
     displayName: {
       type: String,
       trim: true,
