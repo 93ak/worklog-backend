@@ -1,47 +1,12 @@
-// utils/mailer.js
-// ─────────────────────────────────────────────────────────────────────────────
-// Nodemailer transport configured for Gmail App Passwords.
-// Set EMAIL_USER and EMAIL_PASS in your .env file.
-// ─────────────────────────────────────────────────────────────────────────────
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// Create transporter once — reused across all requests
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER, // e.g. yourapp@gmail.com
-    pass: process.env.EMAIL_PASS, // 16-char Gmail App Password (not your real password)
-  },
-});
-
-/**
- * Verify SMTP connection on startup (non-fatal — logs warning only).
- * Uncomment during development to confirm credentials work.
- */
-// transporter.verify((err) => {
-//   if (err) console.warn('⚠️  Email transporter error:', err.message);
-//   else console.log('✅  Email transporter ready');
-// });
-
-/**
- * Send a password reset email.
- * @param {string} toEmail   — recipient email address
- * @param {string} resetLink — full URL e.g. https://app.com/reset-password/<token>
- */
 async function sendPasswordResetEmail(toEmail, resetLink) {
-  const mailOptions = {
-    from: `"WorkLog" <${process.env.EMAIL_USER}>`,
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  const { data, error } = await resend.emails.send({
+    from: 'WorkLog <onboarding@resend.dev>',
     to: toEmail,
     subject: 'WorkLog — Password Reset Request',
-    text: `
-You requested a password reset for your WorkLog account.
-
-Click the link below to set a new password (valid for 20 minutes):
-
-${resetLink}
-
-If you did not request this, ignore this email — your password will not change.
-`.trim(),
     html: `
 <!DOCTYPE html>
 <html>
@@ -86,15 +51,14 @@ If you did not request this, ignore this email — your password will not change
   </table>
 </body>
 </html>`,
-  };
+  });
 
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent to:', toEmail);
-    console.log('✅ Response:', info.response);
-  } catch (err) {
-    console.error('❌ Email FAILED:', err.message);
-    throw err;
+  if (error) {
+    console.error('❌ Email FAILED:', error);
+    throw new Error(error.message);
   }
+
+  console.log('✅ Email sent to:', toEmail, '| ID:', data.id);
 }
+
 module.exports = { sendPasswordResetEmail };
