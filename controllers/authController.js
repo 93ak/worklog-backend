@@ -67,7 +67,8 @@ exports.requestReset = async (req, res) => {
     }
  
     const user = await User.findOne({ email: email.toLowerCase().trim() });
- 
+    console.log("USER FOUND:", !!user);
+    console.log("EMAIL:", email);
     // Even if user not found, return identical response (prevents email enumeration)
     if (!user) {
       return res.json({ message: 'If that email is registered, a reset link has been sent.' });
@@ -86,8 +87,9 @@ exports.requestReset = async (req, res) => {
     // Build reset link using CLIENT_ORIGIN from env
     const resetLink = `${process.env.CLIENT_ORIGIN}/reset-password/${rawToken}`;
  
+    console.log("ABOUT TO SEND EMAIL");
     await sendPasswordResetEmail(user.email, resetLink);
- 
+    console.log("EMAIL FUNCTION COMPLETED"); 
     res.json({ message: 'If that email is registered, a reset link has been sent.' });
   } catch (err) {
     console.error('Request reset error:', err);
