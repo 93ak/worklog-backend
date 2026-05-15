@@ -1,36 +1,77 @@
 const User = require('../models/User');
 const Log = require('../models/Log');
 
-// GET /api/admin/overview — all employees + today's submission status
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function computeCurrentStreak(sortedDescDates, anchor) {
+  if (!sortedDescDates.length) return 0;
+  let streak = 0;
+  let cursor = anchor || todayStr();
+  for (const date of sortedDescDates) {
+    if (date === cursor) {
+      streak++;
+      const d = new Date(cursor);
+      d.setDate(d.getDate() - 1);
+      cursor = d.toISOString().split('T')[0];
+    } else if (date < cursor) {
+      break;
+    }
+  }
+  return streak;
+}
+
+function computeLongestStreak(sortedDescDates) {
+  if (!sortedDescDates.length) return 0;
+  const asc = [...sortedDescDates].sort();
+  let longest = 1, current = 1;
+  for (let i = 1; i < asc.length; i++) {
+    const prev = new Date(asc[i - 1]);
+    const curr = new Date(asc[i]);
+    const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+    if (diff === 1) {
+      current++;
+      if (current > longest) longest = current;
+    } else {
+      current = 1;
+    }
+  }
+  return longest;
+}
+
+// ── GET /api/admin/overview ───────────────────────────────────────────────────
+// Accepts optional ?start=YYYY-MM-DD&end=YYYY-MM-DD query params.
 exports.getOverview = async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const end = req.query.end || todayStr();
+    const start = req.query.start || end;
 
-    // All employees
     const employees = await User.find({ role: 'employee' })
       .select('_id username displayName createdAt')
       .lean();
 
-    // Today's logs
-    const todayLogs = await Log.find({ date: today })
-      .select('userId')
+    const logs = await Log.find({ date: { $gte: start, $lte: end } })
+      .select('userId date')
       .lean();
 
-    const submittedIds = new Set(todayLogs.map((l) => l.userId.toString()));
+    const submittedIds = new Set(logs.map((l) => l.userId.toString()));
 
     const overview = employees.map((emp) => ({
       ...emp,
       submittedToday: submittedIds.has(emp._id.toString()),
     }));
 
-    res.json({ date: today, employees: overview });
+    res.json({ start, end, employees: overview });
   } catch (err) {
     console.error('getOverview error:', err);
     res.status(500).json({ message: 'Failed to fetch overview' });
   }
 };
 
-// GET /api/admin/user/:id/logs — all logs for a specific employee
+// ── GET /api/admin/user/:id/logs ──────────────────────────────────────────────
 exports.getUserLogs = async (req, res) => {
   try {
     const employee = await User.findOne({ _id: req.params.id, role: 'employee' })
@@ -49,5 +90,124 @@ exports.getUserLogs = async (req, res) => {
   } catch (err) {
     console.error('getUserLogs error:', err);
     res.status(500).json({ message: 'Failed to fetch employee logs' });
+  }
+};
+
+// ── GET /api/admin/day/:date ──────────────────────────────────────────────────
+exports.getDayDrillDown = async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ message: 'Date must be in YYYY-MM-DD format' });
+    }
+
+    const employees = await User.find({ role: 'employee' })
+      .select('_id username displayName')
+      .lean();
+
+    const logs = await Log.find({ date })
+      .select('userId content createdAt updatedAt')
+      .lean();
+
+    const logMap = {};
+    logs.forEach((l) => {
+      logMap[l.userId.toString()] = l;
+    });
+
+    const submitted = [];
+    const missing = [];
+
+    employees.forEach((emp) => {
+      const log = logMap[emp._id.toString()];
+      if (log) {
+        submitted.push({ ...emp, log });
+      } else {
+        missing.push(emp);
+      }
+    });
+
+    const total = employees.length;
+    const submittedCount = submitted.length;
+    const completionPct = total ? Math.round((submittedCount / total) * 100) : 0;
+
+    res.json({
+      date,
+      total,
+      submittedCount,
+      missingCount: missing.length,
+      completionPct,
+      submitted,
+      missing,
+    });
+  } catch (err) {
+    console.error('getDayDrillDown error:', err);
+    res.status(500).json({ message: 'Failed to fetch day data' });
+  }
+};
+
+// ── GET /api/admin/user/:id/analytics ────────────────────────────────────────
+exports.getEmployeeAnalytics = async (req, res) => {
+  try {
+    const employee = await User.findOne({ _id: req.params.id, role: 'employee' })
+      .select('-password')
+      .lean();
+
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    const allLogs = await Log.find({ userId: req.params.id })
+      .select('date createdAt')
+      .sort({ date: -1 })
+      .lean();
+
+    const dateSortedDesc = allLogs.map((l) => l.date);
+    const today = todayStr();
+
+    const currentStreak = computeCurrentStreak(dateSortedDesc, today);
+    const longestStreak = computeLongestStreak(dateSortedDesc);
+    const totalSubmissions = allLogs.length;
+    const lastSubmittedDate = dateSortedDesc[0] || null;
+
+    const joinDate = employee.createdAt
+      ? new Date(employee.createdAt).toISOString().split('T')[0]
+      : null;
+
+    let missedDays = null;
+    let completionPct = null;
+
+    if (joinDate) {
+      const start = new Date(joinDate);
+      const end = new Date(today);
+      const totalDays = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
+      missedDays = Math.max(0, totalDays - totalSubmissions);
+      completionPct = Math.min(100, Math.round((totalSubmissions / totalDays) * 100));
+    }
+
+    // Recent 60 log dates for mini activity calendar
+    const recentDates = dateSortedDesc.slice(0, 60);
+
+    // Monthly breakdown
+    const monthlyBreakdown = {};
+    allLogs.forEach((l) => {
+      const ym = l.date.slice(0, 7);
+      monthlyBreakdown[ym] = (monthlyBreakdown[ym] || 0) + 1;
+    });
+
+    res.json({
+      employee,
+      currentStreak,
+      longestStreak,
+      totalSubmissions,
+      missedDays,
+      completionPct,
+      lastSubmittedDate,
+      recentDates,
+      monthlyBreakdown,
+    });
+  } catch (err) {
+    console.error('getEmployeeAnalytics error:', err);
+    res.status(500).json({ message: 'Failed to fetch employee analytics' });
   }
 };
