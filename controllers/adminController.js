@@ -65,7 +65,7 @@ exports.getOverview = async (req, res) => {
     const end = req.query.end || todayStr();
     const start = req.query.start || end;
 
-    const employees = await User.find({ role: 'employee' })
+    const employees = await User.find({})
       .select('_id username displayName createdAt')
       .lean();
 
@@ -90,7 +90,7 @@ exports.getOverview = async (req, res) => {
 // ── GET /api/admin/user/:id/logs ──────────────────────────────────────────────
 exports.getUserLogs = async (req, res) => {
   try {
-    const employee = await User.findOne({ _id: req.params.id, role: 'employee' })
+    const employee = await User.findOne({ _id: req.params.id })
       .select('-password')
       .lean();
 
@@ -118,7 +118,7 @@ exports.getDayDrillDown = async (req, res) => {
       return res.status(400).json({ message: 'Date must be in YYYY-MM-DD format' });
     }
 
-    const employees = await User.find({ role: 'employee' })
+    const employees = await User.find({})
       .select('_id username displayName')
       .lean();
 
@@ -165,7 +165,7 @@ exports.getDayDrillDown = async (req, res) => {
 // ── GET /api/admin/user/:id/analytics ────────────────────────────────────────
 exports.getEmployeeAnalytics = async (req, res) => {
   try {
-    const employee = await User.findOne({ _id: req.params.id, role: 'employee' })
+    const employee = await User.findOne({ _id: req.params.id })
       .select('-password')
       .lean();
 
