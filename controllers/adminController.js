@@ -7,6 +7,22 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
+/**
+ * Count Mon–Fri days between two YYYY-MM-DD strings (inclusive).
+ */
+function countWorkingDays(startStr, endStr) {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  let count = 0;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
 function computeCurrentStreak(sortedDescDates, anchor) {
   if (!sortedDescDates.length) return 0;
   let streak = 0;
@@ -170,20 +186,24 @@ exports.getEmployeeAnalytics = async (req, res) => {
     const totalSubmissions = allLogs.length;
     const lastSubmittedDate = dateSortedDesc[0] || null;
 
-    const joinDate = employee.createdAt
-      ? new Date(employee.createdAt).toISOString().split('T')[0]
-      : null;
-
     let missedDays = null;
     let completionPct = null;
 
-    if (joinDate) {
-      const start = new Date(joinDate);
-      const end = new Date(today);
-      const totalDays = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
-      missedDays = Math.max(0, totalDays - totalSubmissions);
-      completionPct = Math.min(100, Math.round((totalSubmissions / totalDays) * 100));
-    }
+    // Completion rate and missed days are scoped to the current calendar month
+    const monthStart = today.slice(0, 7) + '-01'; // YYYY-MM-01
+    const workingDaysThisMonth = countWorkingDays(monthStart, today);
+
+    const monthSubmissions = allLogs.filter((l) => {
+      if (!l.date.startsWith(today.slice(0, 7))) return false;
+      const [y, m, d] = l.date.split('-').map(Number);
+      const day = new Date(y, m - 1, d).getDay();
+      return day !== 0 && day !== 6; // exclude weekend submissions from count
+    }).length;
+
+    missedDays = Math.max(0, workingDaysThisMonth - monthSubmissions);
+    completionPct = workingDaysThisMonth > 0
+      ? Math.min(100, Math.round((monthSubmissions / workingDaysThisMonth) * 100))
+      : 0;
 
     // Recent 60 log dates for mini activity calendar
     const recentDates = dateSortedDesc.slice(0, 60);
