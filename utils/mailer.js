@@ -4,7 +4,7 @@ async function sendPasswordResetEmail(toEmail, resetLink) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { data, error } = await resend.emails.send({
-    from: 'WorkLog <onboarding@resend.dev>',
+    from: 'WorkLog <noreply@capwdworklog.store>',
     to: toEmail,
     subject: 'WorkLog — Password Reset Request',
     html: `

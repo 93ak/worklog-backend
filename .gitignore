@@ -1,6 +1,6 @@
 # dependencies
 node_modules/
-
+seedemployees.js
 # environment variables (VERY IMPORTANT)
 .env
 
