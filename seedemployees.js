@@ -7,6 +7,14 @@ const User = require('./models/User');
 mongoose.connect(process.env.MONGO_URI);
 
 const employees = [
+    {
+    username: 'admin',
+    email: 'admin@gmail.com',
+    password: 'demo123',
+    role: 'admin',
+    displayName: 'demo',
+    isDemo: true,
+   },
   {
     username: 'alp.akshara@gmail.com',
     email: 'alp.akshara@gmail.com',
@@ -18,7 +26,7 @@ const employees = [
   {
     username: 'alice@gmail.com',
     email: 'alice@gmail.com',
-    password: 'capwd123',
+    password: 'demo123',
     role: 'employee',
     displayName: 'Alice',
   },
@@ -26,7 +34,7 @@ const employees = [
   {
     username: 'bob@gmail.com',
     email: 'bob@gmail.com',
-    password: 'capwd123',
+    password: 'demo123',
     role: 'employee',
     displayName: 'Bob',
   },
@@ -34,7 +42,7 @@ const employees = [
   {
     username: 'carol@gmail.com',
     email: 'carol@gmail.com',
-    password: 'capwd123',
+    password: 'demo123',
     role: 'employee',
     displayName: 'Carol',
   },
@@ -42,7 +50,7 @@ const employees = [
   {
     username: 'dave@gmail.com',
     email: 'dave@gmail.com',
-    password: 'capwd123',
+    password: 'demo123',
     role: 'employee',
     displayName: 'Dave',
   },
