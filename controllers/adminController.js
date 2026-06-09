@@ -66,7 +66,7 @@ exports.getOverview = async (req, res) => {
     const start = req.query.start || end;
 
     const employees = await User.find({})
-      .select('_id username displayName createdAt')
+      .select('_id username displayName role createdAt')
       .lean();
 
     const logs = await Log.find({ date: { $gte: start, $lte: end } })
@@ -90,7 +90,7 @@ exports.getOverview = async (req, res) => {
 // ── GET /api/admin/user/:id/logs ──────────────────────────────────────────────
 exports.getUserLogs = async (req, res) => {
   try {
-    const employee = await User.findOne({ _id: req.params.id })
+    const employee = await User.findOne({ _id: req.params.id, role: 'employee' })
       .select('-password')
       .lean();
 
@@ -119,7 +119,7 @@ exports.getDayDrillDown = async (req, res) => {
     }
 
     const employees = await User.find({})
-      .select('_id username displayName')
+      .select('_id username displayName role')
       .lean();
 
     const logs = await Log.find({ date })
@@ -165,7 +165,7 @@ exports.getDayDrillDown = async (req, res) => {
 // ── GET /api/admin/user/:id/analytics ────────────────────────────────────────
 exports.getEmployeeAnalytics = async (req, res) => {
   try {
-    const employee = await User.findOne({ _id: req.params.id })
+    const employee = await User.findOne({ _id: req.params.id, role: 'employee' })
       .select('-password')
       .lean();
 
@@ -229,5 +229,43 @@ exports.getEmployeeAnalytics = async (req, res) => {
   } catch (err) {
     console.error('getEmployeeAnalytics error:', err);
     res.status(500).json({ message: 'Failed to fetch employee analytics' });
+  }
+};
+
+// ── GET /api/admin/logs/all ───────────────────────────────────────────────────
+// Paginated feed of ALL logs across all users, newest first.
+// Query params: ?page=1&limit=30
+exports.getAllLogs = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 30);
+    const skip = (page - 1) * limit;
+
+    const [logs, total] = await Promise.all([
+      Log.find({})
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'username displayName role')
+        .lean(),
+      Log.countDocuments({}),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      logs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error('getAllLogs error:', err);
+    res.status(500).json({ message: 'Failed to fetch logs' });
   }
 };

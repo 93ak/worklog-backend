@@ -4,12 +4,14 @@ const {
   getUserLogs,
   getDayDrillDown,
   getEmployeeAnalytics,
+  getAllLogs,
 } = require('../controllers/adminController');
 const { protect, adminOnly } = require('../middleware/auth');
 
 router.use(protect, adminOnly);
 
 router.get('/overview', getOverview);
+router.get('/logs/all', getAllLogs);
 router.get('/day/:date', getDayDrillDown);
 router.get('/user/:id/logs', getUserLogs);
 router.get('/user/:id/analytics', getEmployeeAnalytics);
