@@ -2,6 +2,7 @@ const router = require('express').Router();
 const {
   getOverview,
   getUserLogs,
+  getUserLogsPaged,
   getDayDrillDown,
   getEmployeeAnalytics,
   getAllLogs,
@@ -14,6 +15,7 @@ router.get('/overview', getOverview);
 router.get('/logs/all', getAllLogs);
 router.get('/day/:date', getDayDrillDown);
 router.get('/user/:id/logs', getUserLogs);
+router.get('/user/:id/logs/paged', getUserLogsPaged);
 router.get('/user/:id/analytics', getEmployeeAnalytics);
 
 module.exports = router;

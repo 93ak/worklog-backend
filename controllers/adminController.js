@@ -241,14 +241,19 @@ exports.getAllLogs = async (req, res) => {
     const limit = Math.min(100, parseInt(req.query.limit) || 30);
     const skip = (page - 1) * limit;
 
+    const filter = {};
+    if (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) {
+      filter.date = req.query.date;
+    }
+
     const [logs, total] = await Promise.all([
-      Log.find({})
+      Log.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate('userId', 'username displayName role')
         .lean(),
-      Log.countDocuments({}),
+      Log.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -267,5 +272,45 @@ exports.getAllLogs = async (req, res) => {
   } catch (err) {
     console.error('getAllLogs error:', err);
     res.status(500).json({ message: 'Failed to fetch logs' });
+  }
+};
+
+// ── GET /api/admin/user/:id/logs/paged ───────────────────────────────────────
+// Paginated logs for a single employee, newest first.
+// Query: ?page=1&limit=20&date=YYYY-MM-DD (date is optional single-day filter)
+exports.getUserLogsPaged = async (req, res) => {
+  try {
+    const employee = await User.findById(req.params.id).select('-password').lean();
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const skip = (page - 1) * limit;
+
+    const filter = { userId: req.params.id };
+    if (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) {
+      filter.date = req.query.date;
+    }
+
+    const [logs, total] = await Promise.all([
+      Log.find(filter).sort({ date: -1 }).skip(skip).limit(limit).lean(),
+      Log.countDocuments(filter),
+    ]);
+
+    res.json({
+      employee,
+      logs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error('getUserLogsPaged error:', err);
+    res.status(500).json({ message: 'Failed to fetch employee logs' });
   }
 };
